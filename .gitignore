@@ -2,11 +2,20 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+# ==========================================
+# Go
+# ==========================================
+
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
 
 # Test binary, built with `go test -c`
 *.test
@@ -26,7 +35,23 @@ go.work.sum
 
 # env file
 .env
+.env.local
+.env.*.local
+
+# ==========================================
+# Build output
+# ==========================================
+/go-backend-template
+/tmp/
+
+# air hot reload สร้าง tmp/ ระหว่าง dev
+tmp/
 
 # Editor/IDE
 # .idea/
 # .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
