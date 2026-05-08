@@ -1,0 +1,14 @@
+version: "2"
+
+sql:
+  - engine: "postgresql"
+
+    queries: "./internal/db/queries"
+    schema: "./supabase/migrations"
+
+    gen:
+      go:
+        package: "db"
+        out: "./internal/db/generated"
+        sql_package: "pgx/v5"
+        emit_interface: true
