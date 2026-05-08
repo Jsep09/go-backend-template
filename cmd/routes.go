@@ -17,24 +17,35 @@ func registerRoutes(app *fiber.App, db *pgxpool.Pool) {
 		}))
 	})
 
-	// API v1 group
+	// ─────────────────────────────────
+	// API v1
+	// ─────────────────────────────────
 	v1 := app.Group("/api/v1")
 
-	// Public routes (ไม่ต้อง login)
-	// v1.Post("/auth/...", ...)
+	// Protected — ต้อง JWT
+	auth := v1.Group("", middleware.NewAuthJWT(mustGetEnv("SUPABASE_JWT_SECRET")))
 
-	// Protected routes (ต้อง JWT)
-	protected := v1.Group("", middleware.NewAuthJWT(
-		mustGetEnv("SUPABASE_JWT_SECRET"),
-	))
+	// me — ดู user info จาก token
+	auth.Get("/me", func(c fiber.Ctx) error {
+		claims, ok := middleware.GetUserClaims(c)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				models.Fail("unauthorized"),
+			)
+		}
+		return c.JSON(models.Ok(fiber.Map{
+			"user_id": claims.Sub,
+			"role":    claims.Role,
+		}))
+	})
 
-	// Example resource
-	exampleHandler := handlers.NewExampleHandler(db)
-	protected.Get("/examples", exampleHandler.List)
-	protected.Get("/examples/:id", exampleHandler.GetByID)
-	protected.Post("/examples", exampleHandler.Create)
-	protected.Put("/examples/:id", exampleHandler.Update)
-	protected.Delete("/examples/:id", exampleHandler.Delete)
+	// Example resource (ต้องการ DB)
+	example := handlers.NewExampleHandler(db)
+	auth.Get("/examples", example.List)
+	auth.Post("/examples", example.Create)
+	auth.Get("/examples/:id", example.GetByID)
+	auth.Put("/examples/:id", example.Update)
+	auth.Delete("/examples/:id", example.Delete)
 
 	// 404 handler
 	app.Use(func(c fiber.Ctx) error {
