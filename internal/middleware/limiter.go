@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 
-	"github.com/yourusername/go-backend-template/internal/models"
+	"github.com/Jsep09/go-backend-template/internal/models"
 )
 
 func NewRateLimiter(max int, window time.Duration) fiber.Handler {
