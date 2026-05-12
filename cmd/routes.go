@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	dbgen "github.com/Jsep09/go-backend-template/internal/db/generated"
 	"github.com/Jsep09/go-backend-template/internal/controller"
 	"github.com/Jsep09/go-backend-template/internal/middleware"
@@ -58,7 +60,7 @@ func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// ─────────────────────────────────
 	// API v1
 	// ─────────────────────────────────
-	v1 := app.Group("/api/v1")
+	v1 := app.Group("/api/v1", middleware.NewTimeout(30*time.Second))
 
 	// Protected — ต้อง JWT
 	auth := v1.Group("", middleware.NewAuthJWT(mustGetEnv("SUPABASE_JWT_SECRET")))
