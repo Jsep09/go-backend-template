@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
 
+	_ "github.com/Jsep09/go-backend-template/docs" // ← trigger init() ให้ swagger handler รู้จัก spec
 	"github.com/Jsep09/go-backend-template/internal/middleware"
 )
 
@@ -42,7 +43,6 @@ func main() {
 
 		// Error handler กลาง — จัดการ error ที่ handler
 		ErrorHandler: globalErrorHandler,
-
 	})
 
 	// 6. Register Middleware (ลำดับสำคัญมาก!)

@@ -19,7 +19,11 @@ func startServer(app *fiber.App, port string) {
 	// Start server ใน goroutine แยก (ไม่ block main)
 	go func() {
 		addr := ":" + port
-		slog.Info("server starting", "port", port)
+		slog.Info("server listening",
+			"port", port,
+			"url", "http://localhost:"+port,
+			"swagger", "http://localhost:"+port+"/swagger/index.html",
+		)
 
 		if err := app.Listen(addr); err != nil {
 			slog.Error("server error", "error", err)

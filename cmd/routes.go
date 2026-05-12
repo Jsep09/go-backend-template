@@ -2,6 +2,7 @@ package main
 
 import (
 	dbgen "github.com/Jsep09/go-backend-template/internal/db/generated"
+	"github.com/Jsep09/go-backend-template/internal/controller"
 	"github.com/Jsep09/go-backend-template/internal/middleware"
 	"github.com/Jsep09/go-backend-template/internal/models"
 	"github.com/Jsep09/go-backend-template/internal/service"
@@ -12,6 +13,40 @@ import (
 func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// สร้าง queries จาก pool — ส่งให้ทุก service ใช้ร่วมกัน
 	queries := dbgen.New(pool)
+	// Swagger UI — http://localhost:3000/swagger
+	app.Get("/swagger", func(c fiber.Ctx) error {
+		c.Set("Content-Type", "text/html")
+		return c.SendString(`<!DOCTYPE html>
+<html>
+  <head>
+    <title>go-backend-template API</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = () => {
+        SwaggerUIBundle({
+          url: "/swagger/doc.json",
+          dom_id: "#swagger-ui",
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+          layout: "BaseLayout",
+          persistAuthorization: true,
+        })
+      }
+    </script>
+  </body>
+</html>`)
+	})
+
+	// Swagger spec — orval ชี้มาที่ URL นี้เพื่อ generate TypeScript hooks
+	app.Get("/swagger/doc.json", func(c fiber.Ctx) error {
+		return c.SendFile("./docs/swagger.json")
+	})
+
 	// Health check — ไม่ต้อง auth, ใช้ check ว่า service ยัง alive
 	app.Get("/health", func(c fiber.Ctx) error {
 		return c.JSON(models.Ok(fiber.Map{
@@ -42,13 +77,14 @@ func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
 		}))
 	})
 
-	// Example resource
-	example := service.NewExampleHandler(queries)
-	auth.Get("/examples", example.List)
-	auth.Post("/examples", example.Create)
-	auth.Get("/examples/:id", example.GetByID)
-	auth.Put("/examples/:id", example.Update)
-	auth.Delete("/examples/:id", example.Delete)
+	// Example resource — wire service → controller
+	exampleSvc := service.NewExampleService(queries)
+	exampleCtrl := controller.NewExampleController(exampleSvc)
+	auth.Get("/examples", exampleCtrl.List)
+	auth.Post("/examples", exampleCtrl.Create)
+	auth.Get("/examples/:id", exampleCtrl.GetByID)
+	auth.Put("/examples/:id", exampleCtrl.Update)
+	auth.Delete("/examples/:id", exampleCtrl.Delete)
 
 	// 404 handler
 	app.Use(func(c fiber.Ctx) error {

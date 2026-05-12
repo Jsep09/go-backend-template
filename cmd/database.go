@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,9 +19,10 @@ func connectDB(databaseURL string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
 
-	// ทดสอบว่าเชื่อมได้จริงด้วย Ping
+	// Ping เพื่อเช็ค connection จริง
+	// ถ้า fail แค่ warn — server ยังขึ้นได้ DB query จะ fail เองตอนใช้งาน
 	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("unable to ping database: %w", err)
+		slog.Warn("database ping failed, continuing without DB", "error", err)
 	}
 
 	return pool, nil
