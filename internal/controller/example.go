@@ -42,19 +42,29 @@ type CreateExampleRequest struct {
 // @Tags         examples
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {object}  models.APIResponse{data=[]service.ExampleResponse}
+// @Param        page   query     int  false  "หน้าที่ต้องการ (default: 1)"
+// @Param        limit  query     int  false  "จำนวนต่อหน้า (default: 20, max: 100)"
+// @Success      200  {object}  models.APIResponse{data=models.PaginatedResponse[service.ExampleResponse]}
 // @Failure      401  {object}  models.APIResponse
 // @Failure      500  {object}  models.APIResponse
 // @Router       /examples [get]
 func (h *ExampleController) List(c fiber.Ctx) error {
 	claims := mustGetClaims(c)
+	pagination := parsePagination(c)
 
-	results, err := h.svc.List(c.Context(), claims.Sub)
+	items, total, err := h.svc.List(c.Context(), service.ListExamplesInput{
+		UserID: claims.Sub,
+		Page:   pagination.Page,
+		Limit:  pagination.Limit,
+	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid request"))
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to fetch examples"))
 	}
 
-	return c.JSON(models.Ok(results))
+	return c.JSON(models.Ok(models.Paginate(items, total, pagination.Page, pagination.Limit)))
 }
 
 // ─────────────────────────────────────────
@@ -77,6 +87,9 @@ func (h *ExampleController) GetByID(c fiber.Ctx) error {
 
 	result, err := h.svc.GetByID(c.Context(), c.Params("id"), claims.Sub)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid id"))
+		}
 		if errors.Is(err, service.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(models.Fail("example not found"))
 		}
