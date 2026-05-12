@@ -12,22 +12,26 @@ import (
 )
 
 func main() {
-	// 1. Setup Logger
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
-	slog.SetDefault(logger) // set  default logger
-
-	// 2. โหลด .env (เฉพาะ development)
+	// 2. โหลด .env ก่อน เพราะ logger ต้องการ APP_ENV จาก .env
 	if err := godotenv.Load(); err != nil {
 		slog.Info("no .env file found, using system environment variables")
 	}
 
-	//  3. อ่าน Config จาก environment
+	// 3. อ่าน Config จาก environment
 	cfg := loadConfig()
 
+	// 1. Setup Logger — dev ใช้ text (อ่านง่าย), prod ใช้ JSON (machine-readable)
+	var logHandler slog.Handler
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+	if cfg.AppEnv == "production" {
+		logHandler = slog.NewJSONHandler(os.Stdout, opts)
+	} else {
+		logHandler = slog.NewTextHandler(os.Stdout, opts)
+	}
+	slog.SetDefault(slog.New(logHandler))
+
 	// 4. เชื่อมต่อ Database
+
 	db, err := connectDB(cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
