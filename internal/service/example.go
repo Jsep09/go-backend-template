@@ -10,8 +10,10 @@ import (
 	db "github.com/Jsep09/go-backend-template/internal/db/generated"
 )
 
-// ErrNotFound — sentinel error ให้ controller แปลงเป็น 404
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound     = errors.New("not found")
+	ErrInvalidInput = errors.New("invalid input")
+)
 
 // ─────────────────────────────────────────
 // Service struct
@@ -44,38 +46,56 @@ type CreateExampleInput struct {
 	UserID      string
 }
 
+type ListExamplesInput struct {
+	UserID string
+	Page   int
+	Limit  int
+}
+
 // ─────────────────────────────────────────
 // Methods — รับ plain string, return plain types
 // ─────────────────────────────────────────
 
-func (s *ExampleService) List(ctx context.Context, userID string) ([]ExampleResponse, error) {
-	uid, err := parseUUID(userID)
+func (s *ExampleService) List(ctx context.Context, input ListExamplesInput) ([]ExampleResponse, int64, error) {
+	uid, err := parseUUID(input.UserID)
 	if err != nil {
-		return nil, err
+		return nil, 0, ErrInvalidInput
 	}
 
-	examples, err := s.queries.ListExamples(ctx, uid)
+	// query items พร้อม pagination
+	examples, err := s.queries.ListExamples(ctx, db.ListExamplesParams{
+		UserID: uid,
+		Limit:  int32(input.Limit),
+		Offset: int32((input.Page - 1) * input.Limit),
+	})
 	if err != nil {
-		slog.Error("failed to list examples", "error", err, "user_id", userID)
-		return nil, err
+		slog.Error("failed to list examples", "error", err, "user_id", input.UserID)
+		return nil, 0, err
+	}
+
+	// query total count สำหรับคำนวณ total_pages
+	total, err := s.queries.CountExamples(ctx, uid)
+	if err != nil {
+		slog.Error("failed to count examples", "error", err, "user_id", input.UserID)
+		return nil, 0, err
 	}
 
 	results := make([]ExampleResponse, 0, len(examples))
 	for _, ex := range examples {
 		results = append(results, toExampleResponse(ex))
 	}
-	return results, nil
+	return results, total, nil
 }
 
 func (s *ExampleService) GetByID(ctx context.Context, id, userID string) (ExampleResponse, error) {
 	exID, err := parseUUID(id)
 	if err != nil {
-		return ExampleResponse{}, err
+		return ExampleResponse{}, ErrInvalidInput
 	}
 
 	uid, err := parseUUID(userID)
 	if err != nil {
-		return ExampleResponse{}, err
+		return ExampleResponse{}, ErrInvalidInput
 	}
 
 	ex, err := s.queries.GetExample(ctx, db.GetExampleParams{
@@ -96,7 +116,7 @@ func (s *ExampleService) GetByID(ctx context.Context, id, userID string) (Exampl
 func (s *ExampleService) Create(ctx context.Context, input CreateExampleInput) (ExampleResponse, error) {
 	uid, err := parseUUID(input.UserID)
 	if err != nil {
-		return ExampleResponse{}, err
+		return ExampleResponse{}, ErrInvalidInput
 	}
 
 	ex, err := s.queries.CreateExample(ctx, db.CreateExampleParams{
@@ -115,12 +135,12 @@ func (s *ExampleService) Create(ctx context.Context, input CreateExampleInput) (
 func (s *ExampleService) Update(ctx context.Context, id string, input CreateExampleInput) (ExampleResponse, error) {
 	exID, err := parseUUID(id)
 	if err != nil {
-		return ExampleResponse{}, err
+		return ExampleResponse{}, ErrInvalidInput
 	}
 
 	uid, err := parseUUID(input.UserID)
 	if err != nil {
-		return ExampleResponse{}, err
+		return ExampleResponse{}, ErrInvalidInput
 	}
 
 	ex, err := s.queries.UpdateExample(ctx, db.UpdateExampleParams{
@@ -143,12 +163,12 @@ func (s *ExampleService) Update(ctx context.Context, id string, input CreateExam
 func (s *ExampleService) Delete(ctx context.Context, id, userID string) error {
 	exID, err := parseUUID(id)
 	if err != nil {
-		return err
+		return ErrInvalidInput
 	}
 
 	uid, err := parseUUID(userID)
 	if err != nil {
-		return err
+		return ErrInvalidInput
 	}
 
 	if err := s.queries.DeleteExample(ctx, db.DeleteExampleParams{
