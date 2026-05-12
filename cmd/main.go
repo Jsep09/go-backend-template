@@ -58,7 +58,7 @@ func main() {
 	app.Use(middleware.NewLogger()) // Request logger
 
 	// 7. Register Routes
-	registerRoutes(app, db)
+	registerRoutes(app, db, cfg.AppEnv)
 
 	// 8. Start Server + Graceful Shutdown
 	startServer(app, cfg.AppPort)

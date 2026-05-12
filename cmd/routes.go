@@ -12,13 +12,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
+func registerRoutes(app *fiber.App, pool *pgxpool.Pool, appEnv string) {
 	// สร้าง queries จาก pool — ส่งให้ทุก service ใช้ร่วมกัน
 	queries := dbgen.New(pool)
-	// Swagger UI — http://localhost:3000/swagger
-	app.Get("/swagger", func(c fiber.Ctx) error {
-		c.Set("Content-Type", "text/html")
-		return c.SendString(`<!DOCTYPE html>
+
+	// Swagger — เปิดเฉพาะ development เท่านั้น
+	// production ปิดเพื่อไม่ expose API spec ให้คนภายนอก
+	if appEnv != "production" {
+		app.Get("/swagger", func(c fiber.Ctx) error {
+			c.Set("Content-Type", "text/html")
+			return c.SendString(`<!DOCTYPE html>
 <html>
   <head>
     <title>go-backend-template API</title>
@@ -42,12 +45,13 @@ func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
     </script>
   </body>
 </html>`)
-	})
+		})
 
-	// Swagger spec — orval ชี้มาที่ URL นี้เพื่อ generate TypeScript hooks
-	app.Get("/swagger/doc.json", func(c fiber.Ctx) error {
-		return c.SendFile("./docs/swagger.json")
-	})
+		// Swagger spec — orval ชี้มาที่ URL นี้เพื่อ generate TypeScript hooks
+		app.Get("/swagger/doc.json", func(c fiber.Ctx) error {
+			return c.SendFile("./docs/swagger.json")
+		})
+	}
 
 	// Health check — ไม่ต้อง auth, ใช้ check ว่า service ยัง alive
 	app.Get("/health", func(c fiber.Ctx) error {
