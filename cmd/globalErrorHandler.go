@@ -9,10 +9,17 @@ import (
 
 func globalErrorHandler(c fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
+	msg := "internal server error"
 
-	// ถ้า error มาจาก fiber เอง (เช่น 404, 405) ให้ใช้ status code นั้น
+	// ถ้า error มาจาก fiber เอง (เช่น 404, 405, 408) ให้ใช้ status code นั้น
 	if e, ok := err.(*fiber.Error); ok {
 		code = e.Code
+		msg = e.Message
+	}
+
+	// timeout middleware จะ return fiber.ErrRequestTimeout (408)
+	if code == fiber.StatusRequestTimeout {
+		msg = "request timeout — the server took too long to respond"
 	}
 
 	slog.Error("request error",
@@ -22,5 +29,5 @@ func globalErrorHandler(c fiber.Ctx, err error) error {
 		"error", err.Error(),
 	)
 
-	return c.Status(code).JSON(models.Fail(err.Error()))
+	return c.Status(code).JSON(models.Fail(msg))
 }
