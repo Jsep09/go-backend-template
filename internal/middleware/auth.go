@@ -24,13 +24,15 @@ func NewAuthJWT(jwtSecret string) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		lower := strings.ToLower(authHeader)
-		if !strings.HasPrefix(lower, "Bearer ") {
+		if !strings.HasPrefix(lower, "bearer ") {
 			return c.Status(fiber.StatusUnauthorized).JSON(
 				models.Fail("missing or malformed token"),
 			)
 		}
 
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		// trim จาก original (authHeader) ไม่ใช่ lower
+		// เพราะ token ข้างหลัง "Bearer " เป็น case-sensitive
+		tokenStr := authHeader[len("Bearer "):] // ตัด 7 ตัวแรกออก ("Bearer " = 7 chars)
 		claims := &SupabaseClaims{}
 
 		_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
