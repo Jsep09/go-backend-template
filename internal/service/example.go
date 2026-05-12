@@ -27,33 +27,11 @@ func NewExampleService(queries *db.Queries) *ExampleService {
 	return &ExampleService{queries: queries}
 }
 
-// ─────────────────────────────────────────
-// Types — plain Go ไม่มี fiber
-// ─────────────────────────────────────────
-
-type ExampleResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	UserID      string `json:"user_id"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-}
-
-type CreateExampleInput struct {
-	Name        string
-	Description string
-	UserID      string
-}
-
-type ListExamplesInput struct {
-	UserID string
-	Page   int
-	Limit  int
-}
+// compile-time check: ถ้า ExampleService implement interface ไม่ครบ → error ทันที
+var _ ExampleServiceInterface = (*ExampleService)(nil)
 
 // ─────────────────────────────────────────
-// Methods — รับ plain string, return plain types
+// Methods
 // ─────────────────────────────────────────
 
 func (s *ExampleService) List(ctx context.Context, input ListExamplesInput) ([]ExampleResponse, int64, error) {
@@ -62,7 +40,6 @@ func (s *ExampleService) List(ctx context.Context, input ListExamplesInput) ([]E
 		return nil, 0, ErrInvalidInput
 	}
 
-	// query items พร้อม pagination
 	examples, err := s.queries.ListExamples(ctx, db.ListExamplesParams{
 		UserID: uid,
 		Limit:  int32(input.Limit),
@@ -73,7 +50,6 @@ func (s *ExampleService) List(ctx context.Context, input ListExamplesInput) ([]E
 		return nil, 0, err
 	}
 
-	// query total count สำหรับคำนวณ total_pages
 	total, err := s.queries.CountExamples(ctx, uid)
 	if err != nil {
 		slog.Error("failed to count examples", "error", err, "user_id", input.UserID)
@@ -104,7 +80,7 @@ func (s *ExampleService) GetByID(ctx context.Context, id, userID string) (Exampl
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ExampleResponse{}, ErrNotFound // แปลงเป็น sentinel error
+			return ExampleResponse{}, ErrNotFound
 		}
 		slog.Error("failed to get example", "error", err)
 		return ExampleResponse{}, err

@@ -17,20 +17,11 @@ var validate = validator.New()
 // ─────────────────────────────────────────
 
 type ExampleController struct {
-	svc *service.ExampleService
+	svc service.ExampleServiceInterface
 }
 
-func NewExampleController(svc *service.ExampleService) *ExampleController {
+func NewExampleController(svc service.ExampleServiceInterface) *ExampleController {
 	return &ExampleController{svc: svc}
-}
-
-// ─────────────────────────────────────────
-// Request types — HTTP input เท่านั้น
-// ─────────────────────────────────────────
-
-type CreateExampleRequest struct {
-	Name        string `json:"name"        validate:"required,min=1,max=100"`
-	Description string `json:"description" validate:"max=500"`
 }
 
 // ─────────────────────────────────────────
