@@ -1,14 +1,17 @@
 package main
 
 import (
-	"github.com/Jsep09/go-backend-template/internal/handlers"
+	dbgen "github.com/Jsep09/go-backend-template/internal/db/generated"
 	"github.com/Jsep09/go-backend-template/internal/middleware"
 	"github.com/Jsep09/go-backend-template/internal/models"
+	"github.com/Jsep09/go-backend-template/internal/service"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func registerRoutes(app *fiber.App, db *pgxpool.Pool) {
+func registerRoutes(app *fiber.App, pool *pgxpool.Pool) {
+	// สร้าง queries จาก pool — ส่งให้ทุก service ใช้ร่วมกัน
+	queries := dbgen.New(pool)
 	// Health check — ไม่ต้อง auth, ใช้ check ว่า service ยัง alive
 	app.Get("/health", func(c fiber.Ctx) error {
 		return c.JSON(models.Ok(fiber.Map{
@@ -39,8 +42,8 @@ func registerRoutes(app *fiber.App, db *pgxpool.Pool) {
 		}))
 	})
 
-	// Example resource (ต้องการ DB)
-	example := handlers.NewExampleHandler(db)
+	// Example resource
+	example := service.NewExampleHandler(queries)
 	auth.Get("/examples", example.List)
 	auth.Post("/examples", example.Create)
 	auth.Get("/examples/:id", example.GetByID)
