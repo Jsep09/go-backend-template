@@ -1,4 +1,4 @@
-.PHONY: run build docs sqlc migrate
+.PHONY: run build docs sqlc migrate test
 
 ## run: รัน server ใน development mode
 run:
@@ -20,3 +20,12 @@ sqlc:
 ## migrate: push migration ขึ้น Supabase
 migrate:
 	supabase db push
+
+## test: รัน unit tests ทั้งหมด
+test:
+	go test ./internal/... -v
+
+## test-cover: รัน tests พร้อมดู coverage
+test-cover:
+	go test ./internal/... -coverprofile=coverage.out
+	go tool cover -func=coverage.out
