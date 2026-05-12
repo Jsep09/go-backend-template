@@ -10,7 +10,11 @@ LIMIT 1;
 SELECT id, name, description, user_id, created_at, updated_at
 FROM examples
 WHERE user_id = $1
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
+
+-- name: CountExamples :one
+SELECT COUNT(*) FROM examples WHERE user_id = $1;
 
 -- name: CreateExample :one
 INSERT INTO examples (name, description, user_id)

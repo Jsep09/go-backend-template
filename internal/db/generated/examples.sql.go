@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countExamples = `-- name: CountExamples :one
+SELECT COUNT(*) FROM examples WHERE user_id = $1
+`
+
+func (q *Queries) CountExamples(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countExamples, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createExample = `-- name: CreateExample :one
 INSERT INTO examples (name, description, user_id)
 VALUES ($1, $2, $3)
@@ -83,10 +94,17 @@ SELECT id, name, description, user_id, created_at, updated_at
 FROM examples
 WHERE user_id = $1
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListExamples(ctx context.Context, userID pgtype.UUID) ([]Example, error) {
-	rows, err := q.db.Query(ctx, listExamples, userID)
+type ListExamplesParams struct {
+	UserID pgtype.UUID
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) ListExamples(ctx context.Context, arg ListExamplesParams) ([]Example, error) {
+	rows, err := q.db.Query(ctx, listExamples, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

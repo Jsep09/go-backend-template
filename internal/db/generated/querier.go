@@ -11,10 +11,11 @@ import (
 )
 
 type Querier interface {
+	CountExamples(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CreateExample(ctx context.Context, arg CreateExampleParams) (Example, error)
 	DeleteExample(ctx context.Context, arg DeleteExampleParams) error
 	GetExample(ctx context.Context, arg GetExampleParams) (Example, error)
-	ListExamples(ctx context.Context, userID pgtype.UUID) ([]Example, error)
+	ListExamples(ctx context.Context, arg ListExamplesParams) ([]Example, error)
 	UpdateExample(ctx context.Context, arg UpdateExampleParams) (Example, error)
 }
 
