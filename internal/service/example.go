@@ -1,40 +1,33 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
-
-	"github.com/Jsep09/go-backend-template/internal/models"
 
 	db "github.com/Jsep09/go-backend-template/internal/db/generated"
 )
 
-var validate = validator.New()
+// ErrNotFound — sentinel error ให้ controller แปลงเป็น 404
+var ErrNotFound = errors.New("not found")
 
 // ─────────────────────────────────────────
-// Handler struct
+// Service struct
 // ─────────────────────────────────────────
 
-type ExampleHandler struct {
+type ExampleService struct {
 	queries *db.Queries
 }
 
-func NewExampleHandler(queries *db.Queries) *ExampleHandler {
-	return &ExampleHandler{queries: queries}
+func NewExampleService(queries *db.Queries) *ExampleService {
+	return &ExampleService{queries: queries}
 }
 
 // ─────────────────────────────────────────
-// Request / Response types
+// Types — plain Go ไม่มี fiber
 // ─────────────────────────────────────────
-
-type CreateExampleRequest struct {
-	Name        string `json:"name"        validate:"required,min=1,max=100"`
-	Description string `json:"description" validate:"max=500"`
-}
 
 type ExampleResponse struct {
 	ID          string `json:"id"`
@@ -45,168 +38,126 @@ type ExampleResponse struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+type CreateExampleInput struct {
+	Name        string
+	Description string
+	UserID      string
+}
+
 // ─────────────────────────────────────────
-// List GET /api/v1/examples
+// Methods — รับ plain string, return plain types
 // ─────────────────────────────────────────
 
-func (h *ExampleHandler) List(c fiber.Ctx) error {
-	claims := mustGetClaims(c)
-
-	userID, err := parseUUID(claims.Sub)
+func (s *ExampleService) List(ctx context.Context, userID string) ([]ExampleResponse, error) {
+	uid, err := parseUUID(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid user id"))
+		return nil, err
 	}
 
-	examples, err := h.queries.ListExamples(c.Context(), userID)
+	examples, err := s.queries.ListExamples(ctx, uid)
 	if err != nil {
-		slog.Error("failed to list examples", "error", err, "user_id", claims.Sub)
-		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to fetch examples"))
+		slog.Error("failed to list examples", "error", err, "user_id", userID)
+		return nil, err
 	}
 
 	results := make([]ExampleResponse, 0, len(examples))
 	for _, ex := range examples {
 		results = append(results, toExampleResponse(ex))
 	}
-
-	return c.JSON(models.Ok(results))
+	return results, nil
 }
 
-// ─────────────────────────────────────────
-// GetByID GET /api/v1/examples/:id
-// ─────────────────────────────────────────
-
-func (h *ExampleHandler) GetByID(c fiber.Ctx) error {
-	claims := mustGetClaims(c)
-
-	exID, err := parseUUID(c.Params("id"))
+func (s *ExampleService) GetByID(ctx context.Context, id, userID string) (ExampleResponse, error) {
+	exID, err := parseUUID(id)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid id"))
+		return ExampleResponse{}, err
 	}
 
-	userID, err := parseUUID(claims.Sub)
+	uid, err := parseUUID(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid user id"))
+		return ExampleResponse{}, err
 	}
 
-	ex, err := h.queries.GetExample(c.Context(), db.GetExampleParams{
+	ex, err := s.queries.GetExample(ctx, db.GetExampleParams{
 		ID:     exID,
-		UserID: userID,
+		UserID: uid,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return c.Status(fiber.StatusNotFound).JSON(models.Fail("example not found"))
+			return ExampleResponse{}, ErrNotFound // แปลงเป็น sentinel error
 		}
 		slog.Error("failed to get example", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to get example"))
+		return ExampleResponse{}, err
 	}
 
-	return c.JSON(models.Ok(toExampleResponse(ex)))
+	return toExampleResponse(ex), nil
 }
 
-// ─────────────────────────────────────────
-// Create POST /api/v1/examples
-// ─────────────────────────────────────────
-
-func (h *ExampleHandler) Create(c fiber.Ctx) error {
-	claims := mustGetClaims(c)
-
-	var req CreateExampleRequest
-	if err := c.Bind().JSON(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid request body"))
-	}
-
-	if err := validate.Struct(req); err != nil {
-		errs := err.(validator.ValidationErrors)
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail(errs[0].Translate(nil)))
-	}
-
-	userID, err := parseUUID(claims.Sub)
+func (s *ExampleService) Create(ctx context.Context, input CreateExampleInput) (ExampleResponse, error) {
+	uid, err := parseUUID(input.UserID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid user id"))
+		return ExampleResponse{}, err
 	}
 
-	ex, err := h.queries.CreateExample(c.Context(), db.CreateExampleParams{
-		Name:        req.Name,
-		Description: req.Description,
-		UserID:      userID,
+	ex, err := s.queries.CreateExample(ctx, db.CreateExampleParams{
+		Name:        input.Name,
+		Description: input.Description,
+		UserID:      uid,
 	})
 	if err != nil {
-		slog.Error("failed to create example", "error", err, "user_id", claims.Sub)
-		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to create example"))
+		slog.Error("failed to create example", "error", err, "user_id", input.UserID)
+		return ExampleResponse{}, err
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(models.Ok(toExampleResponse(ex)))
+	return toExampleResponse(ex), nil
 }
 
-// ─────────────────────────────────────────
-// Update PUT /api/v1/examples/:id
-// ─────────────────────────────────────────
-
-func (h *ExampleHandler) Update(c fiber.Ctx) error {
-	claims := mustGetClaims(c)
-
-	exID, err := parseUUID(c.Params("id"))
+func (s *ExampleService) Update(ctx context.Context, id string, input CreateExampleInput) (ExampleResponse, error) {
+	exID, err := parseUUID(id)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid id"))
+		return ExampleResponse{}, err
 	}
 
-	userID, err := parseUUID(claims.Sub)
+	uid, err := parseUUID(input.UserID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid user id"))
+		return ExampleResponse{}, err
 	}
 
-	var req CreateExampleRequest
-	if err := c.Bind().JSON(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid request body"))
-	}
-
-	if err := validate.Struct(req); err != nil {
-		errs := err.(validator.ValidationErrors)
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail(errs[0].Translate(nil)))
-	}
-
-	ex, err := h.queries.UpdateExample(c.Context(), db.UpdateExampleParams{
-		Name:        req.Name,
-		Description: req.Description,
+	ex, err := s.queries.UpdateExample(ctx, db.UpdateExampleParams{
+		Name:        input.Name,
+		Description: input.Description,
 		ID:          exID,
-		UserID:      userID,
+		UserID:      uid,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return c.Status(fiber.StatusNotFound).JSON(models.Fail("example not found or not yours"))
+			return ExampleResponse{}, ErrNotFound
 		}
 		slog.Error("failed to update example", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to update example"))
+		return ExampleResponse{}, err
 	}
 
-	return c.JSON(models.Ok(toExampleResponse(ex)))
+	return toExampleResponse(ex), nil
 }
 
-// ─────────────────────────────────────────
-// Delete DELETE /api/v1/examples/:id
-// ─────────────────────────────────────────
-
-func (h *ExampleHandler) Delete(c fiber.Ctx) error {
-	claims := mustGetClaims(c)
-
-	exID, err := parseUUID(c.Params("id"))
+func (s *ExampleService) Delete(ctx context.Context, id, userID string) error {
+	exID, err := parseUUID(id)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid id"))
+		return err
 	}
 
-	userID, err := parseUUID(claims.Sub)
+	uid, err := parseUUID(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(models.Fail("invalid user id"))
+		return err
 	}
 
-	err = h.queries.DeleteExample(c.Context(), db.DeleteExampleParams{
+	if err := s.queries.DeleteExample(ctx, db.DeleteExampleParams{
 		ID:     exID,
-		UserID: userID,
-	})
-	if err != nil {
+		UserID: uid,
+	}); err != nil {
 		slog.Error("failed to delete example", "error", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(models.Fail("failed to delete example"))
+		return err
 	}
 
-	return c.JSON(models.Ok(fiber.Map{"deleted": true}))
+	return nil
 }
