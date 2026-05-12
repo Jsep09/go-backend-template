@@ -20,10 +20,10 @@ var (
 // ─────────────────────────────────────────
 
 type ExampleService struct {
-	queries *db.Queries
+	queries db.Querier // interface แทน concrete struct → mockได้ใน test
 }
 
-func NewExampleService(queries *db.Queries) *ExampleService {
+func NewExampleService(queries db.Querier) *ExampleService {
 	return &ExampleService{queries: queries}
 }
 
